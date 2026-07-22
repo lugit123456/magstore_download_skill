@@ -1,0 +1,8 @@
+LOGIN_USERNAME_PLACEHOLDER = "输入邮箱或用户名"
+LOGIN_PASSWORD_PLACEHOLDER = "输入密码"
+LOGIN_BUTTON_TEXT = "登录"
+SEARCH_PLACEHOLDER = "搜索"
+RESULT_ITEM_SELECTOR = "li.n-list-item:has(.n-list-item__prefix):has(.n-thing-header__title), div.n-card.item[clickable]"
+RESULT_TITLE_SELECTOR = ".n-thing-header__title"
+ISSUE_HEADER_SELECTOR = ".issue-header"
+DOWNLOAD_BUTTON_TEXT = "文件下载"

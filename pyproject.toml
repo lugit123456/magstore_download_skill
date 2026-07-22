@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "magstore-downloader"
+version = "0.1.0"
+description = "Automate latest-issue downloads from MagStore with local state and duplicate protection."
+requires-python = ">=3.11"
+dependencies = [
+  "playwright>=1.45",
+  "PyYAML>=6.0",
+]
+
+[project.scripts]
+magstore-downloader = "magstore_downloader.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
