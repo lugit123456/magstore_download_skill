@@ -27,7 +27,6 @@ def normalize_title(value: str | None) -> str:
     if not value:
         return ""
     text = unicodedata.normalize("NFKC", value).casefold()
-    text = re.sub(r"\[.*?\]", "", text)  # 移除方括号及其内容
     text = re.sub(r"[\W_]+", " ", text, flags=re.UNICODE)
     return re.sub(r"\s+", " ", text).strip()
 
