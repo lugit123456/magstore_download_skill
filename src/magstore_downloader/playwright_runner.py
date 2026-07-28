@@ -277,6 +277,10 @@ class MagStoreRunner:
         self.state.record_download(magazine.id, issue, downloaded_path, now)
         self.logger.info("下载成功: %s", downloaded_path, extra=extra(magazine.id, "download"))
         return MagazineRunResult(magazine.id, "downloaded", "downloaded", downloaded_path, issue)
+
+    def _checked_skip(
+        self,
+        magazine: MagazineConfig,
         issue: IssueInfo | None,
         now: datetime,
         reason: str,
@@ -303,6 +307,92 @@ class MagStoreRunner:
         if not target.exists() or target.stat().st_size <= 0:
             raise RuntimeError(f"下载文件为空或不存在: {target}")
         return target
+    def _goto(self, page, url: str, magazine_id: str = "-", phase: str = "navigation") -> bool:
+        try:
+            page.goto(url, wait_until="domcontentloaded", timeout=self.config.browser.navigation_timeout_ms)
+            return False
+        except Exception as exc:
+            if not _is_navigation_aborted(exc):
+                raise
+            self.logger.warning(
+                "页面导航被前端中断，继续等待可用页面: %s",
+                url,
+                extra=extra(magazine_id, phase),
+            )
+            try:
+                page.wait_for_load_state("domcontentloaded", timeout=3_000)
+            except Exception:
+                pass
+            return True
+
+
+    def _is_login_page(self, page) -> bool:
+        return _is_login_url(page.url, self.config.site.login_path)
+
+    def _clear_login_state(self, page, magazine_id: str, phase: str) -> None:
+        self.logger.warning("清除已保存的浏览器登录态", extra=extra(magazine_id, phase))
+        try:
+            page.context.clear_cookies()
+        except Exception as exc:
+            self.logger.warning("清除 cookies 失败: %s", exc, extra=extra(magazine_id, phase))
+        try:
+            page.evaluate("() => { localStorage.clear(); sessionStorage.clear(); }")
+        except Exception:
+            pass
+        try:
+            self.config.browser.storage_state_path.unlink(missing_ok=True)
+        except Exception as exc:
+            self.logger.warning("删除 storage_state 失败: %s", exc, extra=extra(magazine_id, phase))
+
+    def _result_title(self, item) -> str:
+        title = item.locator(RESULT_TITLE_SELECTOR).first
+        if title.count():
+            return _clean_result_title(_compact_text(title.inner_text()))
+        return _clean_result_title(_compact_text(item.inner_text()))
+
+    def _wait_for_result_items(self, result_items) -> bool:
+        try:
+            result_items.first.wait_for(timeout=self.config.browser.action_timeout_ms)
+            return True
+        except Exception:
+            return False
+
+    def _with_retry(
+        self,
+        func: Callable[[], T],
+        attempts: int,
+        phase: str,
+        retry_exception_type,
+        magazine_id: str = "-",
+    ) -> T:
+        last_error: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                return func()
+            except retry_exception_type as exc:
+                last_error = exc
+                self.logger.warning(
+                    "第 %s/%s 次尝试失败: %s",
+                    attempt,
+                    attempts,
+                    exc,
+                    extra=extra(magazine_id, phase),
+                )
+                if attempt < attempts:
+                    time.sleep(self.config.retry.backoff_seconds * attempt)
+        assert last_error is not None
+        raise last_error
+
+    def _screenshot(self, page, magazine_id: str, phase: str) -> Path | None:
+        try:
+            path = self.config.logging.screenshot_dir / f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{magazine_id}-{phase}.png"
+            page.screenshot(path=str(path), full_page=True)
+            self.logger.info("已保存截图: %s", path, extra=extra(magazine_id, "screenshot"))
+            return path
+        except Exception as exc:
+            self.logger.warning("截图失败: %s", exc, extra=extra(magazine_id, "screenshot"))
+            return None
+
 
 def _compact_text(value: str) -> str:
     return " ".join(value.split())
