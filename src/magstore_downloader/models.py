@@ -10,6 +10,7 @@ MatchMode = Literal["exact", "prefix", "contains", "regex"]
 ScheduleType = Literal["daily", "weekly", "monthly", "interval", "manual"]
 FilenameConflict = Literal["skip", "overwrite", "append"]
 UncertainPolicy = Literal["skip"]
+AttemptKind = Literal["regular", "first", "retry", "final"]
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,14 @@ class RetryConfig:
 
 
 @dataclass(frozen=True)
+class FeishuConfig:
+    enabled: bool = False
+    webhook_env: str = "FEISHU_WEBHOOK_URL"
+    timeout_seconds: float = 10.0
+    notify_on_check_failure: bool = True
+
+
+@dataclass(frozen=True)
 class ScheduleConfig:
     type: ScheduleType
     weekdays: tuple[int, ...] = ()
@@ -97,6 +106,7 @@ class AppConfig:
     download: DownloadConfig
     logging: LoggingConfig
     retry: RetryConfig
+    feishu: FeishuConfig
     magazines: tuple[MagazineConfig, ...]
 
     @property
@@ -158,4 +168,3 @@ class RunSummary:
             self.failed += 1
         else:
             self.skipped += 1
-

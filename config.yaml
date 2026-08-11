@@ -39,6 +39,13 @@ retry:
   download_attempts: 2
   backoff_seconds: 5
 
+notifications:
+  feishu:
+    enabled: true
+    webhook_env: "FEISHU_WEBHOOK_URL"
+    timeout_seconds: 10
+    notify_on_check_failure: true
+
 magazines:
   - id: "wsj"
     enabled: true

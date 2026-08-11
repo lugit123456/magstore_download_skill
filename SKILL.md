@@ -48,6 +48,7 @@ python3 -m magstore_downloader --config ./config.yaml --headed --dry-run
 MAGSTORE_USERNAME=your_username
 MAGSTORE_PASSWORD=your_password
 MAGSTORE_HEADLESS=true
+FEISHU_WEBHOOK_URL=your_feishu_bot_webhook
 ```
 
 所有杂志都配置在 `magazines` 下。注意 `schedule.type` 必须缩进到 `schedule` 下面：
@@ -85,6 +86,8 @@ magazines:
 - `--force` 只忽略检查频率，不会绕过重复下载保护。
 - `--redownload` 明确允许重新下载当前匹配 issue。
 - `--dry-run` 不会点击下载按钮，也不会更新 `state.json`。
+- 多轮抓取依次使用 `--attempt first`、`--attempt retry`、`--attempt final`；这些轮次自动忽略检查频率，但保留下载去重。
+- 最后一轮由 `--attempt final` 显式标识，不根据当前时间推断；最终仍未更新或无法确认更新时会按配置发送飞书通知。
 - 运行时文件应保持忽略：`.env`、`state.json`、`state/`、`logs/`、`artifacts/`、`downloads/`、`.venv/`。
 
 ## 调试检查清单
@@ -96,4 +99,3 @@ magazines:
 3. 检查 `state.json` 中的 `next_check_at`；手动检查时使用 `--force`。
 4. 使用 `--headed --dry-run` 运行，查看候选结果日志。
 5. 如果站点标题和配置不同，调整 `magazine_name`、`search_term` 或 `match_mode`。
-

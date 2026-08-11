@@ -12,6 +12,7 @@ from .models import (
     Credentials,
     CredentialsConfig,
     DownloadConfig,
+    FeishuConfig,
     LoggingConfig,
     MagazineConfig,
     RetryConfig,
@@ -55,6 +56,8 @@ def load_config(path: str | Path) -> AppConfig:
     download_data = _dict(data, "download", required=False)
     logging_data = _dict(data, "logging", required=False)
     retry_data = _dict(data, "retry", required=False)
+    notifications_data = _dict(data, "notifications", required=False)
+    feishu_data = _dict(notifications_data, "feishu", required=False)
 
     magazines_raw = data.get("magazines")
     if not isinstance(magazines_raw, list) or not magazines_raw:
@@ -107,6 +110,12 @@ def load_config(path: str | Path) -> AppConfig:
             search_attempts=_int(retry_data, "search_attempts", 2),
             download_attempts=_int(retry_data, "download_attempts", 2),
             backoff_seconds=float(retry_data.get("backoff_seconds", 5)),
+        ),
+        feishu=FeishuConfig(
+            enabled=bool(feishu_data.get("enabled", False)),
+            webhook_env=str(feishu_data.get("webhook_env", "FEISHU_WEBHOOK_URL")),
+            timeout_seconds=float(feishu_data.get("timeout_seconds", 10)),
+            notify_on_check_failure=bool(feishu_data.get("notify_on_check_failure", True)),
         ),
         magazines=magazines,
     )
@@ -214,4 +223,3 @@ def _resolve_path(base: Path, value: Any) -> Path:
     if not path.is_absolute():
         path = base / path
     return path.resolve()
-

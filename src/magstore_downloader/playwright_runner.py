@@ -11,7 +11,7 @@ from .dedupe import check_duplicate
 from .filenames import ensure_allowed_extension, resolve_conflict_path, sanitize_filename
 from .logging_utils import extra
 from .matching import extract_issue_date, extract_issue_id, title_matches
-from .models import AppConfig, Credentials, IssueInfo, MagazineConfig, MagazineRunResult, RunSummary
+from .models import AttemptKind, AppConfig, Credentials, IssueInfo, MagazineConfig, MagazineRunResult, RunSummary
 from .schedule import compute_next_check, is_magazine_due, now_in_timezone
 from .selectors import (
     DOWNLOAD_BUTTON_TEXT,
@@ -48,40 +48,71 @@ class MagStoreRunner:
         self.dry_run = dry_run
         self.redownload = redownload
 
-    def run(self, selected_magazine: str | None = None, force: bool = False) -> RunSummary:
-        magazines = self._select_due_magazines(selected_magazine, force)
+    def run(
+        self,
+        selected_magazine: str | None = None,
+        force: bool = False,
+        attempt: AttemptKind = "regular",
+    ) -> RunSummary:
+        magazines = self._select_due_magazines(selected_magazine, force or attempt != "regular")
         summary = RunSummary(planned=len(magazines))
         if not magazines:
             self.logger.info("没有到期的杂志任务", extra=extra(phase="schedule"))
             return summary
 
+        if not self.dry_run:
+            now = now_in_timezone(self.config.scheduler)
+            for magazine in magazines:
+                self.state.prepare_attempt(magazine.id, attempt, now)
+            self.state.save()
+
         try:
             from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
             from playwright.sync_api import sync_playwright
-        except ImportError as exc:
-            raise RuntimeError("缺少 Playwright，请先执行: pip install -e . && playwright install chromium") from exc
-
-        with sync_playwright() as p:
-            browser = self._launch_browser(p)
-            context_kwargs = {"accept_downloads": True}
-            if self.config.browser.storage_state_path.exists():
-                context_kwargs["storage_state"] = str(self.config.browser.storage_state_path)
-            context = browser.new_context(**context_kwargs)
-            context.set_default_navigation_timeout(self.config.browser.navigation_timeout_ms)
-            context.set_default_timeout(self.config.browser.action_timeout_ms)
-            page = context.new_page()
-            try:
-                self._ensure_logged_in(page, PlaywrightTimeoutError)
-                context.storage_state(path=str(self.config.browser.storage_state_path))
-                for magazine in magazines:
-                    result = self._run_magazine(page, magazine, PlaywrightTimeoutError)
-                    summary.add(result)
-                    if not self.dry_run:
-                        self.state.save()
-            finally:
-                self.logger.info("关闭浏览器", extra=extra(phase="browser"))
-                context.close()
-                browser.close()
+            with sync_playwright() as p:
+                browser = self._launch_browser(p)
+                context_kwargs = {"accept_downloads": True}
+                if self.config.browser.storage_state_path.exists():
+                    context_kwargs["storage_state"] = str(self.config.browser.storage_state_path)
+                context = browser.new_context(**context_kwargs)
+                context.set_default_navigation_timeout(self.config.browser.navigation_timeout_ms)
+                context.set_default_timeout(self.config.browser.action_timeout_ms)
+                page = context.new_page()
+                try:
+                    self._ensure_logged_in(page, PlaywrightTimeoutError)
+                    context.storage_state(path=str(self.config.browser.storage_state_path))
+                    for magazine in magazines:
+                        result = self._run_magazine(page, magazine, PlaywrightTimeoutError)
+                        summary.add(result)
+                        if not self.dry_run:
+                            self.state.record_attempt_result(
+                                magazine.id,
+                                attempt,
+                                result,
+                                now_in_timezone(self.config.scheduler),
+                            )
+                            self.state.save()
+                finally:
+                    self.logger.info("关闭浏览器", extra=extra(phase="browser"))
+                    context.close()
+                    browser.close()
+        except Exception as exc:
+            self.logger.exception("抓取任务整体失败: %s", exc, extra=extra(phase="failed"))
+            processed_ids = {result.magazine_id for result in summary.results}
+            for magazine in magazines:
+                if magazine.id in processed_ids:
+                    continue
+                result = MagazineRunResult(magazine.id, "failed", str(exc))
+                summary.add(result)
+                if not self.dry_run:
+                    self.state.record_attempt_result(
+                        magazine.id,
+                        attempt,
+                        result,
+                        now_in_timezone(self.config.scheduler),
+                    )
+            if not self.dry_run:
+                self.state.save()
         return summary
 
     def _select_due_magazines(self, selected_magazine: str | None, force: bool) -> list[MagazineConfig]:

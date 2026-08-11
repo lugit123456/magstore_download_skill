@@ -4,7 +4,7 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.magstore.downloader.first</string>
+  <string>com.magstore.downloader.retry</string>
 
   <key>ProgramArguments</key>
   <array>
@@ -15,7 +15,7 @@
     <string>--config</string>
     <string>/ABSOLUTE/PATH/TO/magstore_download_skill/config.yaml</string>
     <string>--attempt</string>
-    <string>first</string>
+    <string>retry</string>
   </array>
 
   <key>WorkingDirectory</key>
@@ -24,16 +24,16 @@
   <key>StartCalendarInterval</key>
   <dict>
     <key>Hour</key>
-    <integer>23</integer>
+    <integer>2</integer>
     <key>Minute</key>
     <integer>0</integer>
   </dict>
 
   <key>StandardOutPath</key>
-  <string>/ABSOLUTE/PATH/TO/magstore_download_skill/logs/launchd.first.out.log</string>
+  <string>/ABSOLUTE/PATH/TO/magstore_download_skill/logs/launchd.retry.out.log</string>
 
   <key>StandardErrorPath</key>
-  <string>/ABSOLUTE/PATH/TO/magstore_download_skill/logs/launchd.first.err.log</string>
+  <string>/ABSOLUTE/PATH/TO/magstore_download_skill/logs/launchd.retry.err.log</string>
 
   <key>RunAtLoad</key>
   <false/>
